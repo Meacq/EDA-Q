@@ -64,6 +64,7 @@ class MyMainWindow(QMainWindow):
 
         # Python Interperter    
         self.python_interperter = PythonInterpreter(self)
+        self.python_interperter.addLocalsVar({"viewer":  self.display_area.gds_editor})
 
         # Set window icon
         icon_path = get_icon_path("logo", "logo.png")
