@@ -21,6 +21,7 @@ from api.design import Design
 
 from GUI.gui_modules.Global.global_state import global_state
 from GUI.gui_modules.Display.ruler import Ruler
+from GUI.gui_modules.Display.gds_editor import GdsEditor
 
 
 class DisplayArea(QTabWidget):
@@ -62,6 +63,9 @@ class DisplayArea(QTabWidget):
         self.gds_tab = self._create_tab("GDS View", is_gds=True)
         self.addTab(self.topo_tab, "Topology")
         self.addTab(self.gds_tab, "GDS")
+
+        self.gds_editor = GdsEditor()
+        self.addTab(self.gds_editor, "GDS Editor")
 
     def _create_tab(self, title, is_gds=True):
         """Create a tab (supporting free drag-and-drop)"""

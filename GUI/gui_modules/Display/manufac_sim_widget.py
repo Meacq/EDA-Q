@@ -76,6 +76,8 @@ class ManufacSimWidget(QWidget):
 
         # connect apply button
         apply_bt.pressed.connect(self._sendSimData)
+        # connect cancel button
+        cancel_bt.pressed.connect(self.hide)
 
     def setData(self, data: list):
         self.table.clearContents()

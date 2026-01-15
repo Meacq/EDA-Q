@@ -8,7 +8,16 @@ from OCC.Core import STEPControl
 import pandas as pd
 from enum import IntEnum
 from manufac_sim_widget import ManufacSimWidget
+from gdspy import *
+from gds_editor_tool.gds_topods import GdsLibTool
 
+# autopep8: off
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../../"))
+import toolbox
+from api.gds import Gds
+# autopep8: on
 
 class GdsEditor(QWidget):
 
@@ -95,6 +104,14 @@ class GdsEditor(QWidget):
         self._in_sim_mode = False
 
         self._sim_widget.applySimData.connect(self.manufacSim)
+        self.resize(self.maximumSize())
+
+    def reset(self):
+        self._selected_shape = None
+        self._in_sim_mode = False
+        self._display.EraseAll()
+        self._display.Repaint()
+        self.component_map = pd.DataFrame()
 
     def sizeHint(self):
         return QSize(800, 600)
@@ -117,7 +134,7 @@ class GdsEditor(QWidget):
             save_fn, _ = QFileDialog.getSaveFileName(
                 None, "Save File", QStandardPaths.writableLocation(QStandardPaths.StandardLocation.HomeLocation), ".step")
             if save_fn:
-                self.saveCurrentLayout(save_fn)
+                self.saveCurrentLayoutAsSTEP(save_fn)
             else:
                 return
         elif action == GdsEditor.Action.SHOW_MANUFACTURING_SIM:
@@ -125,19 +142,28 @@ class GdsEditor(QWidget):
             marked_layer_type = set()
             for i in range(len(self.component_map)):
                 cell = self.component_map.iat[i, 1]
-                if (cell.layer, cell.datatype) not in marked_layer_type:
-                    marked_layer_type.add((cell.layer, cell.datatype))
-                    color = Quantity.Quantity_Color(cell.layer+cell.datatype)
-                    r, g, b = int(color.Red()*255), int(color.Green()
-                                                        * 255), int(color.Blue()*255)
-                    rgb = f"#{r:02x}{g:02x}{b:02x}".upper()
-                    datas.append({'Color': rgb, 'Layer': cell.layer,
-                                  'Datatype': cell.datatype})
+                for polygon in cell.polygons:
+                    if type(polygon) == Path:
+                        layer = polygon.layers[0]
+                        datatype = polygon.datatypes[0]
+                    elif type(polygon) == PolygonSet:
+                        layer = polygon.layers[0]
+                        datatype = polygon.datatypes[0]
+                    else:
+                        pass
+                    if (layer, datatype) not in marked_layer_type:
+                        marked_layer_type.add((layer, datatype))
+                        color = Quantity.Quantity_Color(layer+datatype)
+                        r, g, b = int(color.Red()*255), int(color.Green()
+                                                            * 255), int(color.Blue()*255)
+                        rgb = f"#{r:02x}{g:02x}{b:02x}".upper()
+                        datas.append(
+                            {'Color': rgb, 'Layer': layer, 'Datatype': datatype})
             self._sim_widget.setData(datas)
             self._sim_widget.show()
             pass
 
-    def saveCurrentLayout(self, fn):
+    def saveCurrentLayoutAsSTEP(self, fn):
         writer = STEPControl.STEPControl_Writer()
         for i in range(len(self.component_map)):
             ais_shape = self.component_map.iat[i, 3]
@@ -245,17 +271,44 @@ class GdsEditor(QWidget):
                     s, color=Quantity.Quantity_NameOfColor.Quantity_NOC_CORAL, transparency=0.8)
         self._display.FitAll()
 
+    def showDesignGds(self, design_gds: Gds):
+        """plot gds from design
+
+        Args:
+            design_gds (Gds): _description_
+        """
+        self.reset()
+        [cmpnts, cells] = GdsLibTool.convertDesignDdsToCell(design_gds)
+
+        for idx, cmpnt in enumerate(cmpnts):
+            cell = cells[idx]
+            shapes = GdsLibTool.convertCellToShape(cell)
+            for (topo_shape, layer, datatype) in shapes:
+                ais_shapes = self._display.DisplayShape(
+                    topo_shape, color=Quantity.Quantity_NameOfColor(layer+datatype), transparency=0.8)
+                for a in ais_shapes:
+                    temp = pd.DataFrame(
+                        [{'component': cmpnt, 'cell': cell, 'topo_shape': topo_shape, 'ais_shape': a}])
+                    self.component_map = pd.concat(
+                        [self.component_map, temp], ignore_index=True)
+        self._display.FitAll()
+
     def showComponents(self, components: list):
-        for i in components:
-            cell = i.draw_shape()
-            topo_shape = cell.shape
-            ais_shapes = self._display.DisplayShape(
-                topo_shape, color=Quantity.Quantity_NameOfColor(cell.layer+cell.datatype), transparency=0.8)
-            for a in ais_shapes:
-                temp = pd.DataFrame(
-                    [{'component': i, 'cell': cell, 'topo_shape': topo_shape, 'ais_shape': a}])
-                self.component_map = pd.concat(
-                    [self.component_map, temp], ignore_index=True)
+        self.reset()
+        for cmpnt in components:
+            cmpnt.draw_gds()
+            layer_num = toolbox.custom_hash(
+                cmpnt.chip if hasattr(cmpnt, "chip") else "None")
+            cmpnt.cell.flatten(single_layer=layer_num, single_datatype=0)
+            shapes = GdsLibTool.convertCellToShape(cmpnt.cell)
+            for (topo_shape, layer, datatype) in shapes:
+                ais_shapes = self._display.DisplayShape(
+                    topo_shape, color=Quantity.Quantity_NameOfColor(layer+datatype), transparency=0.8)
+                for a in ais_shapes:
+                    temp = pd.DataFrame(
+                        [{'component': cmpnt, 'cell': cmpnt.cell, 'topo_shape': topo_shape, 'ais_shape': a}])
+                    self.component_map = pd.concat(
+                        [self.component_map, temp], ignore_index=True)
         self._display.FitAll()
 
     def updateComponent(self, comp):
@@ -264,15 +317,18 @@ class GdsEditor(QWidget):
         # save trans
         trans = ais_shape.Transformation()
         self._display.Context.Erase(ais_shape, False)
-        new_cell = comp.draw_shape()
-        new_topo_shape = new_cell.shape
-        new_ais_shape = self._display.DisplayShape(
-            new_topo_shape, color=Quantity.Quantity_NameOfColor(new_cell.layer+new_cell.datatype), transparency=0.8)
-        # apply transformation to new shape
-        for a in new_ais_shape:
-            a.SetLocalTransformation(trans)
-            result.iat[0, 1] = new_cell
-            result.iat[0, 2] = new_topo_shape
+        layer_num = toolbox.custom_hash(
+            comp.chip if hasattr(comp, "chip") else "None")
+        new_cell = comp.cell.flatten(single_layer=layer_num, single_datatype=0)
+        shapes = GdsLibTool.convertCellToShape(new_cell)
+        for (new_topo_shape, layer, datatype) in shapes:
+            new_ais_shape = self._display.DisplayShape(
+                new_topo_shape, color=Quantity.Quantity_NameOfColor(layer+datatype), transparency=0.8)
+            # apply transformation to new shape
+            for a in new_ais_shape:
+                a.SetLocalTransformation(trans)
+                result.iat[0, 1] = new_cell
+                result.iat[0, 2] = new_topo_shape
             result.iat[0, 3] = a
         self._display.FitAll()
 
@@ -310,7 +366,8 @@ class GdsEditor(QWidget):
                         norm_line = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(
                             gp.gp_Pnt(0, 0, current_lower), gp.gp_Pnt(0, 0, current_lower-depth)).Edge()
                         current_lower -= depth
-                    spine = BRepBuilderAPI.BRepBuilderAPI_MakeWire(norm_line).Wire()
+                    spine = BRepBuilderAPI.BRepBuilderAPI_MakeWire(
+                        norm_line).Wire()
                     new_topo_shape = BRepOffsetAPI.BRepOffsetAPI_MakePipe(
                         spine, topo_shape).Shape()
                     self._display.Context.Erase(ais_shape, False)
@@ -335,17 +392,19 @@ if __name__ == "__main__":
         os.path.dirname(current_path), "../.."))
     sys.path.append(PROJ_PATH)
     from library.qubits import transmon
+    from library.readout_lines import *
     from library.coupling_lines import coupling_line_straight
     from GUI.gui_modules.Command.Python_Interpreter import PythonInterpreter
-    import gdsocc
-    # from api.design import Design
 
-    # design = Design()
-    # design.generate_topology(topo_col=32, topo_row=32)
-    # design.topology.generate_random_edges(edges_num=1500)
-    # design.generate_qubits(
-    #     topology=True, qubits_type="Transmon", chip_name="chip0", dist=3000)
-    # design.gds.show_svg()
+    from api.design import Design
+
+    design = Design()
+    design.generate_topology(topo_col=3, topo_row=3)
+    design.topology.generate_random_edges(edges_num=1500)
+    design.generate_qubits(topology=True, qubits_type="Transmon", chip_name="chip0", dist=3000)
+    design.generate_chip(qubits=True, dist=4000)
+    design.generate_readout_lines(qubits=True)
+    design.routing(method="Control_off_chip_routing", chip_name="chip0")
 
     app = QApplication([])
     main_w = QMainWindow()
@@ -358,17 +417,19 @@ if __name__ == "__main__":
 
     viewer = GdsEditor()
     viewer.setBaseSize
-    vlayout.addWidget(viewer)
+    vlayout.addWidget(viewer, 3)
     qubit = transmon.Transmon({})
     cpl = coupling_line_straight.CouplingLineStraight({})
 
-    # viewer.showTopoDS([qubit.draw_shape(), cpl.draw_shape()])
-    viewer.showComponents([qubit, cpl])
-
+    viewer.showDesignGds(design.gds)
+    qub = transmon.Transmon(options=(0,0))
+    qub.draw_gds()
+    qub.save_gds()
+    # viewer.showComponents([qub])
     pyinp = PythonInterpreter()
     pyinp.addLocalsVar({"viewer":  viewer})
     pyinp.clear_output()
     viewer.sendObjToInterpreter.connect(pyinp.addLocalsVar)
-    vlayout.addWidget(pyinp)
+    vlayout.addWidget(pyinp, 1)
     main_w.show()
     sys.exit(app.exec_())
