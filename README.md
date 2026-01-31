@@ -1,11 +1,11 @@
-# EDA-Q v2.0.0
+# EDA-Q v3.0.0
 
 [![](https://img.shields.io/badge/homepage-EDA_Q-orange)](https://github.com/Q-transmon-xmon/EDA-Q)
 
 EDA-Q is an advanced automated design tool for quantum chips (Simultaneous support for superconducting, ion trap, and photonic quantum chip design is provided. For details on the ion trap and photonic quantum chip design methods, please refer to the README of ion_trap_chip and photonic_quantum_chip respectively), aimed at providing comprehensive support for the full design process of quantum chips in the quantum computing field. It integrates core features such as quantum chip topology design, equivalent circuit computation, GDS layout and routing, and simulation, helping researchers and engineers efficiently design and optimize qubit chips.
 ## Directory
 
-- [EDA-Q v2.0.0](#eda-q-v200)
+- [EDA-Q v3.0.0](#eda-q-v300)
   - [Directory](#directory)
   - [Background](#background)
 - [Installation](#installation)
