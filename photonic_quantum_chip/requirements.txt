@@ -1,0 +1,82 @@
+# ============================================
+# Photonic Quantum Chip Routing System - Core Dependencies
+# ============================================
+
+# --------------------------------------------
+# Core Dependencies (Required Installation)
+# --------------------------------------------
+
+# Numerical computation
+numpy>=1.20.0,<2.0.0
+
+# Data processing
+pandas>=1.3.0,<3.0.0
+
+# Visualization
+matplotlib>=3.5.0,<4.0.0
+
+# --------------------------------------------
+# GUI Dependencies (Usually Built-in)
+# --------------------------------------------
+
+# Python built-in GUI library, no additional installation needed
+# tkinter (built-in with Python)
+
+# --------------------------------------------
+# Optional Dependencies (Install Manually as Needed)
+# --------------------------------------------
+
+# Performance optimization - JIT compilation acceleration, significantly improves geometry calculation performance (10-50x)
+# If installation fails, system automatically uses pure Python implementation
+# Installation command:
+# pip install "numba>=0.55.0,<1.0.0"
+# numba>=0.55.0,<1.0.0
+
+# GDS file processing - Used for GDS coordinate extraction and path export
+# If not using GDS functionality, no need to install
+# Installation command:
+# pip install "gdspy>=1.6.0,<2.0.0"
+# gdspy>=1.6.0,<2.0.0
+
+# --------------------------------------------
+# Built-in Modules (No Installation Needed)
+# --------------------------------------------
+
+# pickle (built-in with Python)
+# pathlib (built-in with Python 3.4+)
+# datetime (built-in with Python)
+
+# --------------------------------------------
+# Version Compatibility Notes
+# --------------------------------------------
+
+# Python requirement: >= 3.8
+# Recommended version: Python 3.10-3.12
+# Operating system: Windows 10/11
+#
+# Recommended configuration:
+# - Python 3.10-3.12
+# - numpy 1.23.x
+# - pandas 2.0.x
+# - matplotlib 3.7.x
+# - numba 0.57.x (optional)
+# - gdspy 1.6.x (optional)
+
+# --------------------------------------------
+# Installation Instructions
+# --------------------------------------------
+
+# Basic installation (core dependencies only):
+# pip install -r requirements.txt
+#
+# Using Chinese mirror for faster installation:
+# pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+#
+# Optional: Install performance optimization package:
+# pip install "numba>=0.55.0,<1.0.0"
+#
+# Optional: Install GDS processing package:
+# pip install "gdspy>=1.6.0,<2.0.0"
+#
+# One-time installation of all (including optional):
+# pip install -r requirements.txt && pip install "numba>=0.55.0,<1.0.0" "gdspy>=1.6.0,<2.0.0"
