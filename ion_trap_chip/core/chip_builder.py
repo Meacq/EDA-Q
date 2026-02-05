@@ -14,27 +14,44 @@ from .routing.groove_generator import GrooveGenerator
 
 class IonTrapChipGenerator:
     """Main ion trap chip generator"""
-    
-    def __init__(self):
+
+    def __init__(self, custom_electrode_params=None):
+        """Initialize ion trap chip generator
+
+        Args:
+            custom_electrode_params: Optional dictionary to override individual electrode parameters.
+                                    Format: {(region_key, electrode_index): {param_dict}}
+                                    Example: {('left_top_left', 0): {'electrode_width': 0.080}}
+        """
         # Initialize parameters
         chip_config = ChipParameters()
         electrode_config = ElectrodeParameters()
         routing_config = RoutingParameters()
-        
+
         self.chip_params = chip_config.chip_params
         self.electrode_params = electrode_config.electrode_params
         self.electrode_region_counts = electrode_config.electrode_region_counts
         self.routing_params = routing_config.routing_params
-        
+
+        # Apply custom electrode parameters if provided
+        if custom_electrode_params is not None:
+            # Merge custom parameters with existing individual_electrode_params
+            if 'individual_electrode_params' not in self.electrode_params:
+                self.electrode_params['individual_electrode_params'] = {}
+            self.electrode_params['individual_electrode_params'].update(custom_electrode_params)
+        elif hasattr(electrode_config, 'individual_electrode_params'):
+            # Use individual_electrode_params from config if no custom params provided
+            self.electrode_params['individual_electrode_params'] = electrode_config.individual_electrode_params
+
         # Initialize coordinate system
         self.coord_system = CoordinateSystem(self.chip_params)
-        
+
         # Initialize generators
         self.cavity_generator = CavityGenerator(self.coord_system, self.chip_params)
         self.electrode_generator = ElectrodeGenerator(self.coord_system, self.chip_params, {**self.electrode_params, **self.electrode_region_counts})
         self.routing_calculator = RoutingPathCalculator(self.coord_system, self.chip_params, self.routing_params)
         self.groove_generator = GrooveGenerator(self.routing_params)
-        
+
         self.final_chip = None
     
     def generate_base_chip(self):

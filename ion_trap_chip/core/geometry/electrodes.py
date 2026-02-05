@@ -56,13 +56,10 @@ class ElectrodeGenerator:
             
             start_x = cx + dx * safety_margin
             start_y = cy + dy * safety_margin
-            
-            electrode_width = self.electrode_params['electrode_width']
-            gap_width = self.electrode_params['gap_width']
-            electrode_unit_length = electrode_width + gap_width
-            
-            total_length = electrode_count * electrode_unit_length
-            
+
+            # Calculate total length considering individual electrode parameters
+            total_length = self._calculate_region_total_length(region_key, electrode_count)
+
             end_x = start_x + dx * total_length
             end_y = start_y + dy * total_length
             
@@ -88,39 +85,111 @@ class ElectrodeGenerator:
     def _is_in_long_slot_region(self, cx, cy, dx, dy):
         """Check if electrode region is in long slot area"""
         long_half_width = self.chip_params['trap_long_width_interface'] / 2
-        
-        if abs(dx) > 0 and abs(cy) <= long_half_width * 0.9:  
+
+        if abs(dx) > 0 and abs(cy) <= long_half_width * 0.9:
             return True
-        
+
         if abs(dy) > 0 and abs(cy) <= long_half_width:
             return True
-            
+
         return False
-    
+
+    def _calculate_region_total_length(self, region_key, electrode_count):
+        """Calculate actual total length of region considering individual electrode parameters
+
+        This method accounts for custom electrode widths and gaps to ensure accurate
+        spatial layout when individual electrodes have different dimensions.
+
+        Args:
+            region_key: Region identifier (e.g., 'left_top_left')
+            electrode_count: Number of electrodes in the region
+
+        Returns:
+            Total length in mm required for all electrodes in the region
+        """
+        total_length = 0.0
+
+        # Get default parameters
+        default_width = self.electrode_params.get('electrode_width', 0.060)
+        default_gap = self.electrode_params.get('gap_width', 0.040)
+
+        # Get individual electrode parameters if they exist
+        individual_params = self.electrode_params.get('individual_electrode_params', {})
+
+        # Sum up the length for each electrode
+        for electrode_index in range(electrode_count):
+            key = (region_key, electrode_index)
+
+            if key in individual_params:
+                # Use custom parameters for this electrode
+                custom = individual_params[key]
+                width = custom.get('electrode_width', default_width)
+                gap = custom.get('gap_width', default_gap)
+            else:
+                # Use default parameters
+                width = default_width
+                gap = default_gap
+
+            total_length += (width + gap)
+
+        return total_length
+
     def generate_region_electrode_chain(self, region):
-        """Generate electrode chain for a single region"""
+        """Generate electrode chain for a single region
+
+        This method creates a chain of electrodes along a region, supporting individual
+        electrode parameters. Each electrode's position is calculated cumulatively based
+        on the actual widths and gaps of all preceding electrodes.
+
+        Args:
+            region: Region dictionary containing start point, direction, and electrode count
+
+        Returns:
+            List of electrode data dictionaries with positions and parameters
+        """
         is_horizontal = region['is_horizontal']
-        
-        electrode_depth = self.electrode_params['electrode_depth']  
-        electrode_width = self.electrode_params['electrode_width']          
-        gap_width = self.electrode_params['gap_width']                      
-        electrode_height = self.electrode_params['electrode_height']          
         electrode_count = region['electrode_count']
-        
+        region_key = region['key']
+
         start_x, start_y = region['start_point']
         direction_x, direction_y = region['direction']
-        
+
+        # Get default parameters
+        default_depth = self.electrode_params.get('electrode_depth', 0.1)
+        default_width = self.electrode_params.get('electrode_width', 0.060)
+        default_gap = self.electrode_params.get('gap_width', 0.040)
+        default_height = self.electrode_params.get('electrode_height', 1.0)
+
+        # Get individual electrode parameters if they exist
+        individual_params = self.electrode_params.get('individual_electrode_params', {})
+
         region_electrodes = []
-        current_position_offset = 0
-        
-        electrode_unit_length = electrode_width + gap_width
-        
+        current_position_offset = 0.0
+
         for electrode_index in range(electrode_count):
+            # Get parameters for this specific electrode
+            key = (region_key, electrode_index)
+
+            if key in individual_params:
+                # Use custom parameters for this electrode
+                custom = individual_params[key]
+                electrode_depth = custom.get('electrode_depth', default_depth)
+                electrode_width = custom.get('electrode_width', default_width)
+                gap_width = custom.get('gap_width', default_gap)
+                electrode_height = custom.get('electrode_height', default_height)
+            else:
+                # Use default parameters
+                electrode_depth = default_depth
+                electrode_width = default_width
+                gap_width = default_gap
+                electrode_height = default_height
+
+            # Calculate electrode center position
             electrode_center_offset = current_position_offset + electrode_width / 2
-            
+
             electrode_center_x = start_x + direction_x * electrode_center_offset
             electrode_center_y = start_y + direction_y * electrode_center_offset
-            
+
             electrode_data = {
                 'local_id': electrode_index,
                 'global_id': self.electrode_counter,
@@ -130,14 +199,15 @@ class ElectrodeGenerator:
                 'height': electrode_height,
                 'is_horizontal': is_horizontal,
                 'region_id': region['id'],
-                'region_key': region['key'],
+                'region_key': region_key,
             }
-            
+
             region_electrodes.append(electrode_data)
             self.electrode_counter += 1
-            
-            current_position_offset += electrode_unit_length
-        
+
+            # Update cumulative offset using actual electrode width and gap
+            current_position_offset += (electrode_width + gap_width)
+
         return region_electrodes
     
     def create_region_electrode_geometry(self, electrode_data):

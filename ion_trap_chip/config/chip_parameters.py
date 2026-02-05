@@ -12,7 +12,7 @@ class ChipParameters:
             'layer_thickness': 0.5,   # mm Thickness of each layer
             'layer_spacing': 0.0,     # mm Spacing between layers
             
-            # Ion trap镂空区域参数
+            # Ion trap hollow area parameters
             'trap_long_length': 8.0,   # mm Long slot length
             'trap_short_length': 4.0,  # mm Short slot length
             
@@ -68,6 +68,17 @@ class ElectrodeParameters:
             'left_bottom_down': 8,   # Lower left intersection - down direction
             'right_bottom_right': 8, # Lower right intersection - right direction
             'right_bottom_down': 8,  # Lower right intersection - down direction
+        }
+
+        # Individual electrode parameters - override default parameters for specific electrodes
+        # Key format: (region_key, electrode_index)
+        # Value: dictionary of parameters to override (electrode_depth, electrode_width, gap_width, electrode_height)
+        # Example:
+        #   ('left_top_left', 0): {'electrode_width': 0.080, 'gap_width': 0.045}
+        # This allows customizing individual electrodes while maintaining spatial consistency
+        self.individual_electrode_params = {
+            # Add custom electrode parameters here
+            # Example: ('left_top_left', 0): {'electrode_width': 0.080},
         }
 
 class RoutingParameters:
